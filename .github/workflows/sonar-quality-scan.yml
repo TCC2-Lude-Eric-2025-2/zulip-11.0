@@ -1,0 +1,55 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sonarcloud:
+    name: Run SonarCloud Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout do código
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Necessário para análise correta de histórico pelo Sonar
+
+      # 2. Configurar Python (backend)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. Instalar dependências necessárias
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+
+      # 4. Rodar testes backend e gerar coverage.xml
+      - name: Run backend tests with coverage
+        run: |
+          pytest --cov=zerver --cov-report xml:var/coverage.xml
+
+      # 5. (Opcional) Executar linters
+      - name: Run static analysis (mypy & ruff)
+        run: |
+          pip install mypy ruff black
+          mypy zerver || true
+          ruff check zerver || true
+
+      # 6. SonarCloud Scanner
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        with:
+          args: >
+            -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
+            -Dsonar.organization=tcc2-lude-eric-2025-2
+            -Dsonar.python.coverage.reportPaths=var/coverage.xml
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
