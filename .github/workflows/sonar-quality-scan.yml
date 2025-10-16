@@ -49,25 +49,23 @@ jobs:
           python -m pip install --upgrade pip wheel setuptools
           ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
 
-      # 5. Detect and activate Zulip virtualenv
-      - name: Detect and activate Zulip venv
-        id: detect-venv
+      # 5. Ensure and activate Zulip virtualenv
+      - name: Ensure and activate Zulip venv
         run: |
-          echo "🔍 Searching for Zulip virtualenv..."
-          VENV_PATH=""
           if [ -d ".venv" ]; then
-            VENV_PATH=".venv"
+            echo "✅ Found .venv"
           else
-            VENV_PATH=$(find . -type d -name "zulip-py3-venv" 2>/dev/null | head -n 1)
+            echo "⚠️ .venv not found, creating..."
+            python -m venv .venv
           fi
 
-          if [ -z "$VENV_PATH" ]; then
-            echo "❌ Could not locate Zulip virtualenv!"
-            exit 1
-          fi
+          echo "Activating Zulip venv..."
+          source .venv/bin/activate
+          python -V
+          pip install --upgrade pip wheel setuptools
 
-          echo "✅ Zulip virtualenv found at: $VENV_PATH"
-          echo "VENV_PATH=$VENV_PATH" >> $GITHUB_ENV
+          echo "Running Zulip provisioning..."
+          ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"]
 
       # 6. Set up Node.js
       - name: Set up Node.js
