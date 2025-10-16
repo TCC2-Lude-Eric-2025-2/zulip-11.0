@@ -46,27 +46,28 @@ jobs:
           echo "Running Zulip provisioning..."
           ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
 
-      - name: Detect and activate Zulip venv
+      - name: Detect Zulip virtualenv and persist path
         id: detect-venv
         run: |
           echo "🔍 Searching for Zulip virtualenv..."
-          # Detect either local or cached virtualenv path
-          VENV_PATH=""
-          if [ -d ".venv" ]; then
-            VENV_PATH=".venv"
-          else
-            VENV_PATH=$(find /srv -type d -name "zulip-py3-venv" 2>/dev/null | head -n 1)
-          fi
-
+          VENV_PATH=$(find /srv -type d -name "zulip-py3-venv" 2>/dev/null | head -n 1)
           if [ -z "$VENV_PATH" ]; then
             echo "❌ Could not locate Zulip virtualenv!"
             echo "Files under /srv:"
             ls -la /srv || true
             exit 1
           fi
-
-          echo "✅ Zulip virtualenv found at: $VENV_PATH"
+          echo "✅ Found virtualenv at: $VENV_PATH"
           echo "VENV_PATH=$VENV_PATH" >> $GITHUB_ENV
+
+      - name: Validate Zulip environment
+        run: |
+          source $VENV_PATH/bin/activate
+          which python
+          python -V
+          echo "Installed Django version:"
+          python -m django --version || true
+          pip list | grep Zulip || true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -82,13 +83,11 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Run backend tests with coverage
+      - name: Run backend tests with coverage (in Zulip venv)
         run: |
           mkdir -p var
           echo "Activating Zulip environment from $VENV_PATH..."
           source $VENV_PATH/bin/activate
-          python -V
-          
           echo "Running backend tests with coverage..."
           ./tools/test-backend --coverage --xml-report || echo "⚠️ Some backend tests failed"
 
@@ -120,6 +119,21 @@ jobs:
           [ -f "var/node-coverage/lcov.info" ] && echo "✅ Frontend lcov.info exists"
           echo "--- Listing files in var ---"
           find var -maxdepth 2 -type f | head -20
+
+      # 🟩 Upload coverage artifacts
+      - name: Upload backend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: var/coverage.xml
+
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: var/node-coverage/lcov.info
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
