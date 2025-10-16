@@ -7,13 +7,22 @@ on:
     branches: ["main", "11.0"]
   workflow_dispatch:
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
 jobs:
   sonarcloud:
     name: Run SonarCloud Analysis
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -34,22 +43,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # 4. Install dependencies and provision Zulip
-      - name: Install Python dependencies and provision
-        run: |
-          python -m pip install --upgrade pip wheel setuptools
-          ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
-
-      # 5. Ensure and activate Zulip venv
+      # 4. Create and activate virtualenv, install dependencies
       - name: Ensure and activate Zulip venv
         run: |
-          if [ ! -d ".venv" ]; then
+          if [ -d ".venv" ]; then
+            echo "✅ Found existing .venv"
+          else
+            echo "⚠️ .venv not found, creating..."
             python -m venv .venv
           fi
-          source .venv/bin/activate
-          pip install --upgrade pip wheel setuptools
 
-      # 6. Run backend tests with coverage
+          echo "Activating Zulip venv..."
+          source .venv/bin/activate
+          python -V
+          pip install --upgrade pip wheel setuptools
+          pip install -r requirements/requirements.txt
+          echo "Running Zulip provisioning..."
+          ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
+
+      # 5. Run backend tests with coverage
       - name: Run backend tests
         run: |
           mkdir -p var
@@ -57,7 +69,7 @@ jobs:
           ./tools/test-backend --coverage --xml-report || echo "⚠️ Some backend tests failed"
           [ -f "var/coverage.xml" ] && echo "✅ Backend coverage report created" || echo "❌ Backend coverage.xml missing"
 
-      # 7. SonarCloud Scan
+      # 6. SonarCloud Scan
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v5.0.0
         with:
