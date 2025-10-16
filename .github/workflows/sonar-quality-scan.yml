@@ -44,7 +44,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       # 4. Install dependencies and provision Zulip
-      - name: Install Python dependencies
+      - name: Install Python dependencies and provision
         run: |
           python -m pip install --upgrade pip wheel setuptools
           ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
@@ -52,11 +52,11 @@ jobs:
       # 5. Ensure and activate Zulip virtualenv
       - name: Ensure and activate Zulip venv
         run: |
-          if [ -d ".venv" ]; then
-            echo "✅ Found .venv"
-          else
+          if [ ! -d ".venv" ]; then
             echo "⚠️ .venv not found, creating..."
             python -m venv .venv
+          else
+            echo "✅ .venv exists"
           fi
 
           echo "Activating Zulip venv..."
@@ -64,43 +64,15 @@ jobs:
           python -V
           pip install --upgrade pip wheel setuptools
 
-          echo "Running Zulip provisioning..."
-          ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"]
-
-      # 6. Set up Node.js
-      # - name: Set up Node.js
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     node-version: '18'
-      #     cache: 'pnpm'
-
-      # # 7. Install pnpm
-      # - name: Install pnpm
-      #   uses: pnpm/action-setup@v4
-      #   with:
-      #     version: 10.15.1
-
-      # # 8. Install frontend dependencies
-      # - name: Install frontend dependencies
-      #   run: pnpm install
-
-      # 9. Run backend tests with coverage
+      # 6. Run backend tests with coverage
       - name: Run backend tests
         run: |
           mkdir -p var
-          echo "Activating Zulip venv from $VENV_PATH..."
-          source $VENV_PATH/bin/activate
+          source .venv/bin/activate
           ./tools/test-backend --coverage --xml-report || echo "⚠️ Some backend tests failed"
           [ -f "var/coverage.xml" ] && echo "✅ Backend coverage report created" || echo "❌ Backend coverage.xml missing"
 
-      # # 10. Run frontend tests with coverage
-      # - name: Run frontend tests
-      #   run: |
-      #     mkdir -p var/node-coverage
-      #     ./tools/test-js-with-node --coverage || echo "⚠️ Some frontend tests failed"
-      #     [ -f "var/node-coverage/lcov.info" ] && echo "✅ Frontend LCOV created" || echo "❌ Frontend lcov.info missing"
-
-      # 11. SonarCloud Scan
+      # 7. SonarCloud Scan
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         with:
