@@ -7,15 +7,6 @@ on:
     branches: ["main", "11.0"]
   workflow_dispatch:
 
-concurrency:
-  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-  pull-requests: write
-  security-events: write
-
 jobs:
   sonarcloud:
     name: Run SonarCloud Analysis
@@ -49,19 +40,13 @@ jobs:
           python -m pip install --upgrade pip wheel setuptools
           ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
 
-      # 5. Ensure and activate Zulip virtualenv
+      # 5. Ensure and activate Zulip venv
       - name: Ensure and activate Zulip venv
         run: |
           if [ ! -d ".venv" ]; then
-            echo "⚠️ .venv not found, creating..."
             python -m venv .venv
-          else
-            echo "✅ .venv exists"
           fi
-
-          echo "Activating Zulip venv..."
           source .venv/bin/activate
-          python -V
           pip install --upgrade pip wheel setuptools
 
       # 6. Run backend tests with coverage
@@ -74,11 +59,12 @@ jobs:
 
       # 7. SonarCloud Scan
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@v5.0.0
         with:
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
+            -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
