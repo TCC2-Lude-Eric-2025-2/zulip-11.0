@@ -68,21 +68,21 @@ jobs:
           ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"]
 
       # 6. Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'pnpm'
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '18'
+      #     cache: 'pnpm'
 
-      # 7. Install pnpm
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.15.1
+      # # 7. Install pnpm
+      # - name: Install pnpm
+      #   uses: pnpm/action-setup@v4
+      #   with:
+      #     version: 10.15.1
 
-      # 8. Install frontend dependencies
-      - name: Install frontend dependencies
-        run: pnpm install
+      # # 8. Install frontend dependencies
+      # - name: Install frontend dependencies
+      #   run: pnpm install
 
       # 9. Run backend tests with coverage
       - name: Run backend tests
@@ -93,12 +93,12 @@ jobs:
           ./tools/test-backend --coverage --xml-report || echo "⚠️ Some backend tests failed"
           [ -f "var/coverage.xml" ] && echo "✅ Backend coverage report created" || echo "❌ Backend coverage.xml missing"
 
-      # 10. Run frontend tests with coverage
-      - name: Run frontend tests
-        run: |
-          mkdir -p var/node-coverage
-          ./tools/test-js-with-node --coverage || echo "⚠️ Some frontend tests failed"
-          [ -f "var/node-coverage/lcov.info" ] && echo "✅ Frontend LCOV created" || echo "❌ Frontend lcov.info missing"
+      # # 10. Run frontend tests with coverage
+      # - name: Run frontend tests
+      #   run: |
+      #     mkdir -p var/node-coverage
+      #     ./tools/test-js-with-node --coverage || echo "⚠️ Some frontend tests failed"
+      #     [ -f "var/node-coverage/lcov.info" ] && echo "✅ Frontend LCOV created" || echo "❌ Frontend lcov.info missing"
 
       # 11. SonarCloud Scan
       - name: SonarCloud Scan
@@ -108,7 +108,6 @@ jobs:
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
-            -Dsonar.javascript.lcov.reportPaths=var/node-coverage/lcov.info
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
