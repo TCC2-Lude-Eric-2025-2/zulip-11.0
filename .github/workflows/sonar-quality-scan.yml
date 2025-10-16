@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Necessário para análise correta de histórico pelo SonarCloud
+          fetch-depth: 0
 
       # 2. Configurar Python
       - name: Set up Python
@@ -24,7 +24,17 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 3. Garantir que a venv do Zulip exista e instalar dependências
+      # 3. Cache da virtualenv
+      - name: Cache Python virtualenv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-zulip-venv-${{ hashFiles('requirements/dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-zulip-venv-
+
+      # 4. Garantir que a venv exista e instalar dependências
       - name: Ensure Zulip virtualenv and install dependencies
         run: |
           echo "🔍 Checking for Zulip virtualenv..."
@@ -38,23 +48,23 @@ jobs:
           python -V
           pip install --upgrade pip setuptools wheel
           echo "📦 Installing dependencies from requirements/dev.txt..."
-          pip install -r requirements/dev.txt
+          pip install -r requirements/dev.txt --progress-bar off | while read line; do echo "$line"; done
           pip install pytest pytest-cov mypy ruff
 
-      # 4. Rodar testes backend e gerar coverage.xml
+      # 5. Rodar testes backend e gerar coverage.xml
       - name: Run backend tests with coverage
         run: |
           source .venv/bin/activate
           pytest --cov=zerver --cov-report xml:var/coverage.xml
 
-      # 5. Análise estática opcional
+      # 6. Análise estática opcional
       - name: Run static analysis (mypy & ruff)
         run: |
           source .venv/bin/activate
           mypy zerver || true
           ruff check zerver || true
 
-      # 6. SonarCloud Scan
+      # 7. SonarCloud Scan
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         with:
