@@ -103,7 +103,7 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_CLOUD_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
 
       - name: Verify coverage files before SonarCloud scan
         if: always()
