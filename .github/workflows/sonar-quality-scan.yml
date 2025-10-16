@@ -1,4 +1,4 @@
-name: SonarCloud Analysis
+name: Django Tests (venv)
 
 on:
   push:
@@ -7,71 +7,48 @@ on:
     branches: [ main ]
 
 jobs:
-  sonarcloud:
-    name: Run SonarCloud Analysis
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout do código
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # 2. Configurar Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
 
-      # 3. Cache da virtualenv
-      - name: Cache Python virtualenv
-        id: cache-venv
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: ${{ runner.os }}-zulip-venv-${{ hashFiles('requirements/dev.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-zulip-venv-
-
-      # 4. Garantir que a venv exista e instalar dependências
-      - name: Ensure Zulip virtualenv and install dependencies
+      - name: Create and activate virtual environment
         run: |
-          echo "🔍 Checking for Zulip virtualenv..."
-          if [ ! -d ".venv" ]; then
-            echo "⚙️ Creating virtual environment..."
-            python -m venv .venv
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip wheel setuptools
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+          if [ -f pyproject.toml ]; then
+            pip install .
           fi
 
-          echo "🚀 Activating virtual environment..."
-          source .venv/bin/activate
-          python -V
-          pip install --upgrade pip setuptools wheel
-          echo "📦 Installing dependencies from requirements/dev.txt..."
-          pip install -r requirements/dev.txt --progress-bar off | while read line; do echo "$line"; done
-          pip install pytest pytest-cov mypy ruff
-
-      # 5. Rodar testes backend e gerar coverage.xml
-      - name: Run backend tests with coverage
-        run: |
-          source .venv/bin/activate
-          pytest --cov=zerver --cov-report xml:var/coverage.xml
-
-      # 6. Análise estática opcional
-      - name: Run static analysis (mypy & ruff)
-        run: |
-          source .venv/bin/activate
-          mypy zerver || true
-          ruff check zerver || true
-
-      # 7. SonarCloud Scan
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        with:
-          args: >
-            -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
-            -Dsonar.organization=tcc2-lude-eric-2025-2
-            -Dsonar.python.coverage.reportPaths=var/coverage.xml
+      - name: Run tests with pytest
         env:
-          SONAR_CLOUD_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          source .venv/bin/activate
+          pytest -v --maxfail=1 --disable-warnings --cov=.
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov
