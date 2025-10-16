@@ -2,19 +2,9 @@ name: SonarCloud Analysis
 
 on:
   push:
-    branches: ["main", "11.0"]
+    branches: [ main ]
   pull_request:
-    branches: ["main", "11.0"]
-  workflow_dispatch:
-
-concurrency:
-  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-  pull-requests: write
-  security-events: write
+    branches: [ main ]
 
 jobs:
   sonarcloud:
@@ -22,62 +12,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
+      # 1. Checkout do código
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Necessário para análise correta de histórico pelo SonarCloud
 
-      # 2. Set up Python
+      # 2. Configurar Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 3. Cache pip
-      - name: Cache Python dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      # 4. Create and activate virtualenv, install dependencies
-      - name: Ensure and activate Zulip venv
+      # 3. Garantir que a venv do Zulip exista e instalar dependências
+      - name: Ensure Zulip virtualenv and install dependencies
         run: |
-          if [ -d ".venv" ]; then
-            echo "✅ Found existing .venv"
-          else
-            echo "⚠️ .venv not found, creating..."
+          echo "🔍 Checking for Zulip virtualenv..."
+          if [ ! -d ".venv" ]; then
+            echo "⚙️ Creating virtual environment..."
             python -m venv .venv
           fi
 
-          echo "Activating Zulip venv..."
+          echo "🚀 Activating virtual environment..."
           source .venv/bin/activate
           python -V
-          pip install --upgrade pip wheel setuptools
-          pip install -r requirements/requirements.txt
-          echo "Running Zulip provisioning..."
-          ./tools/provision --no-dev || echo "⚠️ Provision completed with warnings"
+          pip install --upgrade pip setuptools wheel
+          echo "📦 Installing dependencies from requirements/dev.txt..."
+          pip install -r requirements/dev.txt
+          pip install pytest pytest-cov mypy ruff
 
-      # 5. Run backend tests with coverage
-      - name: Run backend tests
+      # 4. Rodar testes backend e gerar coverage.xml
+      - name: Run backend tests with coverage
         run: |
-          mkdir -p var
           source .venv/bin/activate
-          ./tools/test-backend --coverage --xml-report || echo "⚠️ Some backend tests failed"
-          [ -f "var/coverage.xml" ] && echo "✅ Backend coverage report created" || echo "❌ Backend coverage.xml missing"
+          pytest --cov=zerver --cov-report xml:var/coverage.xml
+
+      # 5. Análise estática opcional
+      - name: Run static analysis (mypy & ruff)
+        run: |
+          source .venv/bin/activate
+          mypy zerver || true
+          ruff check zerver || true
 
       # 6. SonarCloud Scan
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        uses: SonarSource/sonarcloud-github-action@master
         with:
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
-            -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
+          SONAR_CLOUD_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
