@@ -2,73 +2,58 @@ name: SonarCloud Analysis
 
 on:
   push:
-    branches: ["main", "11.0"]
+    branches: [ main ]
   pull_request:
-    branches: ["main", "11.0"]
+    branches: [ main ]
   workflow_dispatch:
-
-concurrency:
-  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-  pull-requests: write
-  security-events: write
 
 jobs:
   sonarcloud:
-    name: SonarCloud Analysis
+    name: Run SonarCloud Analysis
     runs-on: ubuntu-latest
+
     steps:
-      # 1️⃣ Checkout completo
+      # 1. Checkout do código
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # necessário para histórico completo no SonarCloud
+          fetch-depth: 0
 
-      # 2️⃣ Configurar Python
+      # 2. Configurar Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      # 3️⃣ Cache de pip
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements/dev.txt') }}
-
-      # 4️⃣ Garantir virtualenv e instalar dependências
-      - name: Ensure virtualenv and install dependencies
+      # 3. Criar e ativar venv, instalar dependências via tools/provision
+      - name: Setup virtualenv and install dependencies
         run: |
-          if [ ! -d ".venv" ]; then
-            python -m venv .venv
-          fi
-          .venv/bin/pip install --upgrade pip setuptools wheel
-          .venv/bin/pip install -r requirements/dev.txt
-          .venv/bin/pip install pytest pytest-cov mypy ruff
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          tools/provision
 
-      # 5️⃣ Rodar testes e gerar coverage.xml
+      # 4. Rodar testes e gerar coverage.xml
       - name: Run backend tests with coverage
         run: |
-          .venv/bin/pytest --cov=src --cov-report=xml:var/coverage.xml
+          source .venv/bin/activate
+          pytest --cov=zerver --cov-report xml:var/coverage.xml
 
-      # 6️⃣ Análise estática opcional
+      # 5. Análise estática opcional
       - name: Run static analysis (mypy & ruff)
         run: |
-          .venv/bin/mypy src || true
-          .venv/bin/ruff check src || true
+          source .venv/bin/activate
+          mypy zerver || true
+          ruff check zerver || true
 
-      # 7️⃣ SonarCloud Scan
+      # 6. SonarCloud Scan
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        uses: SonarSource/sonarcloud-github-action@master
         with:
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
+          SONAR_CLOUD_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
