@@ -1,4 +1,4 @@
-name: SonarCloud Analysis (Light)
+name: SonarCloud Analysis (Stable Python 3.10)
 
 on:
   push:
@@ -13,31 +13,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout do código
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Python
+      # 2. Setup do Python 3.10 (versão oficial Zulip 11.0)
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
+      # 3. Cache da venv para acelerar builds
+      - name: Cache Python virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py310-${{ hashFiles('requirements.txt', 'tools/ci/setup-backend') }}
+          restore-keys: |
+            venv-${{ runner.os }}-py310-
+
+      # 4. Setup backend (modo leve)
       - name: Setup backend environment
-        run: |
-          ./tools/ci/setup-backend --skip-dev-db-build
+        run: ./tools/ci/setup-backend --skip-dev-db-build
 
+      # 5. Rodar testes backend com cobertura
       - name: Run backend tests with coverage
         run: |
           source .venv/bin/activate
           pytest --cov=zerver --cov-report xml:var/coverage.xml
 
+      # 6. Análise estática (mypy e ruff)
       - name: Run static analysis
         run: |
           source .venv/bin/activate
           mypy zerver || true
           ruff check zerver || true
 
+      # 7. SonarCloud
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         with:
