@@ -13,41 +13,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout do código
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Configurar Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Criar e ativar venv, instalar dependências via tools/provision (modo leve)
       - name: Setup virtualenv and install dependencies
         run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          # Rodar tools/provision sem sudo nem serviços extras
-          tools/provision --skip-services --skip-frontend
+          ./tools/ci/setup-backend --skip-dev-db-build
 
-      # 4. Rodar testes backend e gerar coverage.xml
       - name: Run backend tests with coverage
         run: |
           source .venv/bin/activate
           pytest --cov=zerver --cov-report xml:var/coverage.xml
 
-      # 5. Rodar análise estática (mypy & ruff)
       - name: Run static analysis
         run: |
           source .venv/bin/activate
           mypy zerver || true
           ruff check zerver || true
 
-      # 6. SonarCloud Scan
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         with:
