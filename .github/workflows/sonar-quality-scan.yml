@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Setup virtualenv and install dependencies
+      - name: Setup backend environment
         run: |
           ./tools/ci/setup-backend --skip-dev-db-build
 
