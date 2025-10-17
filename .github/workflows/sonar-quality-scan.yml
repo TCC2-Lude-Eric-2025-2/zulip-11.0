@@ -56,6 +56,6 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_CLOUD_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
