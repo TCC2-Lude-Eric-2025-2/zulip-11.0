@@ -52,7 +52,7 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=zulip-11.0
-            -Dsonar.organization=TCC2-Lude-Eric-2025-2_zulip-11.0
+            -Dsonar.organization=TCC2-Lude-Eric-2025-2
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
         env:
