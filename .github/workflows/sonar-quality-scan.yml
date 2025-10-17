@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Necessário para histórico correto no SonarCloud
 
       # 2. Configurar Python
       - name: Set up Python
@@ -25,15 +25,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      # 3. Criar e ativar venv, instalar dependências via tools/provision
+      # 3. Criar e ativar venv e instalar dependências Python básicas
       - name: Setup virtualenv and install dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
-          tools/provision
+          pip install pytest pytest-cov mypy ruff
 
-      # 4. Rodar testes e gerar coverage.xml
+      # 4. Rodar testes backend e gerar coverage.xml
       - name: Run backend tests with coverage
         run: |
           source .venv/bin/activate
