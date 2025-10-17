@@ -1,4 +1,4 @@
-name: SonarCloud Analysis
+name: SonarCloud Analysis (Light)
 
 on:
   push:
@@ -17,21 +17,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Necessário para histórico correto no SonarCloud
+          fetch-depth: 0
 
-      # 2. Configurar Python
+      # 2. Configurar Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Criar e ativar venv e instalar dependências Python básicas
+      # 3. Criar e ativar venv, instalar dependências via tools/provision (modo leve)
       - name: Setup virtualenv and install dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
-          pip install pytest pytest-cov mypy ruff
+          # Rodar tools/provision sem sudo nem serviços extras
+          tools/provision --skip-services --skip-frontend
 
       # 4. Rodar testes backend e gerar coverage.xml
       - name: Run backend tests with coverage
@@ -39,8 +40,8 @@ jobs:
           source .venv/bin/activate
           pytest --cov=zerver --cov-report xml:var/coverage.xml
 
-      # 5. Análise estática opcional
-      - name: Run static analysis (mypy & ruff)
+      # 5. Rodar análise estática (mypy & ruff)
+      - name: Run static analysis
         run: |
           source .venv/bin/activate
           mypy zerver || true
