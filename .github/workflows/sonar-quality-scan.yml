@@ -39,6 +39,14 @@ jobs:
           source .venv/bin/activate
           pytest --cov=zerver --cov-report xml:var/coverage.xml || echo "Tests skipped (adjust paths if needed)"
 
+      # 4.1. Enviar cobertura ao Codecov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: var/coverage.xml
+          fail_ci_if_error: true
+          verbose: true
+
       # 5. Rodar análise estática
       - name: Run static analysis
         run: |
