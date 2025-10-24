@@ -87,6 +87,12 @@ jobs:
           # O '--coverage' é o que gera o var/coverage.xml
           ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
 
+
+      # 7. Renomear paths
+      - name: Rename coverage paths
+        run: |
+          sed -i 's|/__w||g' var/coverage.xml
+
       # 7. Enviar tudo para o SonarCloud
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
