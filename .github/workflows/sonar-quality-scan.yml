@@ -1,68 +1,101 @@
-name: SonarCloud Analysis (Light)
+name: Lightweight SonarCloud CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
 jobs:
-  sonarcloud:
-    name: Lightweight SonarCloud CI
+  sonar-coverage-light:
+    name: Lightweight SonarCloud Coverage
     runs-on: ubuntu-latest
 
+    # Usamos o container 'jammy' (Ubuntu 22.04) pois ele é o
+    # principal que gera cobertura de backend e frontend.
+    container: zulip/ci:jammy
+
+    env:
+      # Essencial para o provisionamento do Zulip
+      HOME: /home/github/
+      # Define o OS para os scripts de cache
+      OS_MATRIX_VAR: jammy
+
     steps:
-      # 1. Checkout do código
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # 1. Checkout (com fetch-depth: 0 para o Sonar)
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Configurar Python 3.10 (compatível com Zulip 11)
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      # 2. Criar diretórios de cache (necessário)
+      - name: Create cache directories
+        run: |
+          dirs=(/srv/zulip-emoji-cache)
+          sudo mkdir -p "${dirs[@]}"
+          sudo chown -R github "${dirs[@]}"
+
+      # 3. Restaurar Caches (essencial para velocidade)
+      - name: Restore pnpm store
+        uses: actions/cache@v4
         with:
-          python-version: '3.10'
+          path: /__w/.pnpm-store
+          key: v1-pnpm-store-${{ env.OS_MATRIX_VAR }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      # 3. Instalar dependências mínimas para testes
-      - name: Install minimal dependencies
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements/dev.txt || pip install pytest pytest-cov mypy ruff
-
-      # 4. Rodar testes backend com cobertura
-      - name: Run backend tests with coverage
-        run: |
-          source .venv/bin/activate
-          pytest --cov=zerver --cov-report xml:var/coverage.xml || echo "Tests skipped (adjust paths if needed)"
-
-      # 4.1. Enviar cobertura ao Codecov
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Restore uv cache
+        uses: actions/cache@v4
         with:
-          files: var/coverage.xml
-          fail_ci_if_error: true
-          verbose: true
+          path: ~/.cache/uv
+          key: uv-${{ env.OS_MATRIX_VAR }}-${{ hashFiles('uv.lock') }}
+          restore-keys: uv-${{ env.OS_MATRIX_VAR }}-
 
-      # 5. Rodar análise estática
-      - name: Run static analysis
+      - name: Restore emoji cache
+        uses: actions/cache@v4
+        with:
+          path: /srv/zulip-emoji-cache
+          key: v1-emoji-${{ env.OS_MATRIX_VAR }}-${{ hashFiles('tools/setup/emoji/emoji_map.json', 'tools/setup/emoji/build_emoji', 'tools/setup/emoji/emoji_setup_utils.py', 'tools/setup/emoji/emoji_names.py', 'package.json') }}
+          restore-keys: v1-emoji-${{ env.OS_MATRIX_VAR }}
+
+      # 4. Instalar dependências (O passo mais importante)
+      # Isso provisiona o banco de dados, instala pacotes e prepara o venv
+      - name: Install dependencies
         run: |
-          source .venv/bin/activate
-          mypy zerver || true
-          ruff check zerver || true
+          ./tools/ci/setup-backend --skip-dev-db-build
+          scripts/lib/clean_unused_caches.py --verbose --threshold=0
 
-      # 6. Enviar análise ao SonarCloud
+      # 5. Rodar testes de Node (Frontend) com cobertura
+      - name: Run node tests (for coverage)
+        run: |
+          source tools/ci/activate-venv
+          ./tools/test-js-with-node --coverage --parallel=1
+
+      # 6. Rodar testes de Backend com cobertura
+      - name: Run backend tests (for coverage)
+        run: |
+          source tools/ci/activate-venv
+          # O '--coverage' é o que gera o var/coverage.xml
+          ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
+
+      # 7. Enviar tudo para o SonarCloud
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
+        uses: SonarSource/sonarcloud-github-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
         with:
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
-            -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            -Dsonar.javascript.lcov.reportPaths=var/node-coverage/lcov.info
