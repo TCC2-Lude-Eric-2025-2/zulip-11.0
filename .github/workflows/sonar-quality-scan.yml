@@ -22,19 +22,16 @@ jobs:
   sonar-coverage-light:
     name: Lightweight SonarCloud Coverage
     runs-on: ubuntu-latest
-
-    # Usamos o container 'jammy' (Ubuntu 22.04) pois ele é o
-    # principal que gera cobertura de backend e frontend.
-    container: zulip/ci:jammy
-
+    
+    # Usamos o container 'jammy' (Ubuntu 22.04)
+    container: zulip/ci:jammy 
+    
     env:
-      # Essencial para o provisionamento do Zulip
       HOME: /home/github/
-      # Define o OS para os scripts de cache
-      OS_MATRIX_VAR: jammy
+      OS_MATRIX_VAR: jammy 
 
     steps:
-      # 1. Checkout (com fetch-depth: 0 para o Sonar)
+      # 1. Checkout (com fetch-depth: 0 para o Sonar analisar o histórico)
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -68,7 +65,6 @@ jobs:
           restore-keys: v1-emoji-${{ env.OS_MATRIX_VAR }}
 
       # 4. Instalar dependências (O passo mais importante)
-      # Isso provisiona o banco de dados, instala pacotes e prepara o venv
       - name: Install dependencies
         run: |
           ./tools/ci/setup-backend --skip-dev-db-build
@@ -80,28 +76,29 @@ jobs:
           source tools/ci/activate-venv
           ./tools/test-js-with-node --coverage --parallel=1
 
-      # 6. Rodar testes de Backend com cobertura
-      - name: Run backend tests (for coverage)
+      # 6. Rodar testes de Backend E CORRIGIR os caminhos da cobertura
+      - name: Run backend tests and fix coverage paths
         run: |
           source tools/ci/activate-venv
-          # O '--coverage' é o que gera o var/coverage.xml
+          
+          # 1. Roda os testes, que criam o var/coverage.xml (com caminhos errados)
           ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
-
-
-      # 7. Renomear paths
-      - name: Rename coverage paths
-        run: |
-          sed -i 's|/__w||g' var/coverage.xml
+          
+          # 2. CORREÇÃO: Usamos 'sed' para remover o prefixo de caminho absoluto "quebrado"
+          #    Isso transforma "/zulip-11.0/zulip-11.0/analytics/file.py"
+          #    em "analytics/file.py", que o SonarCloud entende.
+          sed -i 's|/zulip-11.0/zulip-11.0/||g' var/coverage.xml
 
       # 7. Enviar tudo para o SonarCloud
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }} 
         with:
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
             -Dsonar.javascript.lcov.reportPaths=var/node-coverage/lcov.info
+            -Dsonar.python.version=3.10
