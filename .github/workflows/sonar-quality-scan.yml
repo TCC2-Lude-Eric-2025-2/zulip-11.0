@@ -1,4 +1,4 @@
-name: Lightweight SonarCloud CI (Backend Only)
+name: Lightweight CI (SonarCloud + Codecov)
 
 on:
   push:
@@ -71,19 +71,22 @@ jobs:
 
       # 5. ETAPA DE NODE TEST REMOVIDA
 
-      # 6. Rodar testes de Backend E DEBUGAR o caminho
-      - name: Run backend tests and DEBUG coverage paths
+      # 6. Rodar testes de Backend (Limpo)
+      # Apenas gera o XML. O Codecov vai lidar com os caminhos "quebrados".
+      - name: Run backend tests for coverage
         run: |
           source tools/ci/activate-venv
-          
-          # 1. Roda os testes e cria o XML com caminhos quebrados
           ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
-          
-          # 2. DEBUG: Este comando vai imprimir o caminho absoluto que precisamos corrigir.
-          echo "DEBUG: Procurando o caminho do 'zerver/models.py' no XML..."
-          grep "zerver/models.py" var/coverage.xml | head -n 1 || true
 
-      # 7. Enviar tudo para o SonarCloud (Com as exclusões corretas)
+      # 7. NOVO: Enviar cobertura para o Codecov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: var/coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+      # 8. Enviar análise para o SonarCloud (SEM COBERTURA)
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
@@ -93,6 +96,5 @@ jobs:
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
-            -Dsonar.python.coverage.reportPaths=var/coverage.xml
             -Dsonar.python.version=3.10
             -Dsonar.exclusions=**/*.js,**/*.ts,**/*.jsx,**/*.tsx,**/static/**,**/node_modules/**,**/tests/**,**/test_**,**/tools/**,**/scripts/**,**/puppet/**,**/docs/**,**/__pycache__/**,**/test-data/**,**/starlight_help/**
