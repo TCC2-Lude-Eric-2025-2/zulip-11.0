@@ -71,14 +71,19 @@ jobs:
 
       # 5. ETAPA DE NODE TEST REMOVIDA
 
-      # 6. Rodar testes de Backend (SEM 'sed')
-      # O debug mostrou que os caminhos já são relativos, o 'sed' não é mais necessário.
-      - name: Run backend tests for coverage
+      # 6. Rodar testes de Backend E DEBUGAR o caminho
+      - name: Run backend tests and DEBUG coverage paths
         run: |
           source tools/ci/activate-venv
+          
+          # 1. Roda os testes e cria o XML com caminhos quebrados
           ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
+          
+          # 2. DEBUG: Este comando vai imprimir o caminho absoluto que precisamos corrigir.
+          echo "DEBUG: Procurando o caminho do 'zerver/models.py' no XML..."
+          grep "zerver/models.py" var/coverage.xml | head -n 1 || true
 
-      # 7. Enviar tudo para o SonarCloud (COM A LISTA DE EXCLUSÃO CORRETA)
+      # 7. Enviar tudo para o SonarCloud (Com as exclusões corretas)
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
