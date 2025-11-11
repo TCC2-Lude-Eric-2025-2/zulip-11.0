@@ -71,33 +71,23 @@ jobs:
 
       # 5. ETAPA DE NODE TEST REMOVIDA
 
-      # 6. Rodar testes de Backend E CORRIGIR os caminhos da cobertura
-      - name: Run backend tests and fix coverage paths
+      # 6. Rodar testes de Backend (SEM 'sed')
+      # O debug mostrou que os caminhos já são relativos, o 'sed' não é mais necessário.
+      - name: Run backend tests for coverage
         run: |
           source tools/ci/activate-venv
-          
-          # 1. Roda os testes
           ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
-          
-          # 2. DEBUG
-          echo "DEBUG: Vendo os 5 primeiros caminhos 'filename=' no coverage.xml"
-          grep "filename=" var/coverage.xml | head -n 5 || true
-          
-          # 3. CORREÇÃO
-          sed -i 's|/zulip-11.0/zulip-11.0/||g' var/coverage.xml
 
-      # 7. Enviar tudo para o SonarCloud (AGORA COM EXCLUSÕES CORRETAS)
+      # 7. Enviar tudo para o SonarCloud (COM A LISTA DE EXCLUSÃO CORRETA)
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }} 
         with:
-          # A mágica está aqui. Nós excluímos todo o código de frontend
-          # E todo o código de teste/scripts do backend.
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
             -Dsonar.python.version=3.10
-            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.jsx,**/*.tsx,**/static/**,**/node_modules/**,**/tests/**,**/test_**,**/migrations/**,**/tools/**,**/scripts/**,**/puppet/**,**/docs/**,**/__pycache__/**,**/test-data/**,**/zproject/**
+            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.jsx,**/*.tsx,**/static/**,**/node_modules/**,**/tests/**,**/test_**,**/tools/**,**/scripts/**,**/puppet/**,**/docs/**,**/__pycache__/**,**/test-data/**,**/starlight_help/**
