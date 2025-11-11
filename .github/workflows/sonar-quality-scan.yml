@@ -60,17 +60,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /srv/zulip-emoji-cache
-          key: v1-emoji-${{ env.OS_MATRIX_VAR }}-${{ hashFiles('tools/setup/emoji/emoji_map.json', 'tools/setup/emoji/build_emoji', 'tools/setup/emoji/emoji_setup_utils.py', 'tools/setup/emoji/emoji_names.py', 'package.json') }}
+          key: v1-emoji-${{ env.OS_MATRIX_VAR }}-${{ hashFiles('tools/setup/emoji/emoji_map.json', 'tools/setup/emoji/build_emoji', 'tools.setup/emoji/emoji_setup_utils.py', 'tools/setup/emoji/emoji_names.py', 'package.json') }}
           restore-keys: v1-emoji-${{ env.OS_MATRIX_VAR }}
 
-      # 4. Instalar dependências (Apenas o backend é necessário agora)
+      # 4. Instalar dependências
       - name: Install dependencies
         run: |
           ./tools/ci/setup-backend --skip-dev-db-build
           scripts/lib/clean_unused_caches.py --verbose --threshold=0
 
       # 5. ETAPA DE NODE TEST REMOVIDA
-      # Não precisamos mais rodar os testes de frontend, economizando tempo.
 
       # 6. Rodar testes de Backend E CORRIGIR os caminhos da cobertura
       - name: Run backend tests and fix coverage paths
@@ -80,23 +79,25 @@ jobs:
           # 1. Roda os testes
           ./tools/test-backend --coverage --xml-report --no-html-report --include-webhooks --include-transaction-tests --no-cov-cleanup --ban-console-output
           
-          # 2. DEBUG: Imprime os caminhos (com '|| true' para não falhar)
+          # 2. DEBUG
           echo "DEBUG: Vendo os 5 primeiros caminhos 'filename=' no coverage.xml"
           grep "filename=" var/coverage.xml | head -n 5 || true
           
-          # 3. CORREÇÃO: Esta é a correção real, que agora será executada.
+          # 3. CORREÇÃO
           sed -i 's|/zulip-11.0/zulip-11.0/||g' var/coverage.xml
 
-      # 7. Enviar tudo para o SonarCloud (AGORA SOMENTE O BACKEND)
+      # 7. Enviar tudo para o SonarCloud (AGORA COM EXCLUSÕES CORRETAS)
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_CLOUD_TOKEN }} 
         with:
+          # A mágica está aqui. Nós excluímos todo o código de frontend
+          # E todo o código de teste/scripts do backend.
           args: >
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
             -Dsonar.python.version=3.10
-            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.jsx,**/*.tsx,**/static/**,**/node_modules/**
+            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.jsx,**/*.tsx,**/static/**,**/node_modules/**,**/tests/**,**/test_**,**/migrations/**,**/tools/**,**/scripts/**,**/puppet/**,**/docs/**,**/__pycache__/**,**/test-data/**,**/zproject/**
