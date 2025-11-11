@@ -1,4 +1,4 @@
-name: Lightweight SonarCloud CI
+name: Lightweight SonarCloud CI (Backend Only)
 
 on:
   push:
@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   sonar-coverage-light:
-    name: Lightweight SonarCloud Coverage
+    name: Lightweight SonarCloud Coverage (Backend Only)
     runs-on: ubuntu-latest
     
     container: zulip/ci:jammy 
@@ -63,17 +63,14 @@ jobs:
           key: v1-emoji-${{ env.OS_MATRIX_VAR }}-${{ hashFiles('tools/setup/emoji/emoji_map.json', 'tools/setup/emoji/build_emoji', 'tools/setup/emoji/emoji_setup_utils.py', 'tools/setup/emoji/emoji_names.py', 'package.json') }}
           restore-keys: v1-emoji-${{ env.OS_MATRIX_VAR }}
 
-      # 4. Instalar dependências
+      # 4. Instalar dependências (Apenas o backend é necessário agora)
       - name: Install dependencies
         run: |
           ./tools/ci/setup-backend --skip-dev-db-build
           scripts/lib/clean_unused_caches.py --verbose --threshold=0
 
-      # 5. Rodar testes de Node (Frontend) com cobertura
-      - name: Run node tests (for coverage)
-        run: |
-          source tools/ci/activate-venv
-          ./tools/test-js-with-node --coverage --parallel=1
+      # 5. ETAPA DE NODE TEST REMOVIDA
+      # Não precisamos mais rodar os testes de frontend, economizando tempo.
 
       # 6. Rodar testes de Backend E CORRIGIR os caminhos da cobertura
       - name: Run backend tests and fix coverage paths
@@ -90,7 +87,7 @@ jobs:
           # 3. CORREÇÃO: Esta é a correção real, que agora será executada.
           sed -i 's|/zulip-11.0/zulip-11.0/||g' var/coverage.xml
 
-      # 7. Enviar tudo para o SonarCloud
+      # 7. Enviar tudo para o SonarCloud (AGORA SOMENTE O BACKEND)
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         env:
@@ -101,5 +98,5 @@ jobs:
             -Dsonar.projectKey=TCC2-Lude-Eric-2025-2_zulip-11.0
             -Dsonar.organization=tcc2-lude-eric-2025-2
             -Dsonar.python.coverage.reportPaths=var/coverage.xml
-            -Dsonar.javascript.lcov.reportPaths=var/node-coverage/lcov.info
             -Dsonar.python.version=3.10
+            -Dsonar.exclusions=**/*.js,**/*.ts,**/*.jsx,**/*.tsx,**/static/**,**/node_modules/**
